@@ -282,10 +282,10 @@ export default function SftpUpload() {
                               variant="outline"
                               className={
                                 log.status === "success"
-                                  ? "bg-chart-2/15 text-chart-2 border-transparent"
+                                  ? "bg-cyan-500/15 text-cyan-400 border-transparent"
                                   : log.status === "error" || log.status === "failed"
-                                  ? "bg-destructive/15 text-destructive border-transparent"
-                                  : "bg-chart-4/15 text-chart-4 border-transparent"
+                                  ? "bg-destructive/15 text-red-400 border-transparent"
+                                  : "bg-amber-500/15 text-amber-400 border-transparent"
                               }
                             >
                               {log.status === "success" ? (

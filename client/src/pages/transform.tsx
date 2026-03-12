@@ -236,7 +236,7 @@ export default function Transform() {
                     isDragActive
                       ? "border-primary bg-primary/5"
                       : selectedFile
-                      ? "border-chart-2 bg-chart-2/5"
+                      ? "border-cyan-500 bg-cyan-500/10"
                       : "border-border"
                   }`}
                   data-testid="dropzone-source"
@@ -244,7 +244,7 @@ export default function Transform() {
                   <input {...getInputProps()} />
                   {selectedFile ? (
                     <div className="flex flex-col items-center gap-2">
-                      <FileSpreadsheet className="h-6 w-6 text-chart-2" />
+                      <FileSpreadsheet className="h-6 w-6 text-cyan-400" />
                       <p className="text-sm font-medium truncate max-w-full">{selectedFile.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {(selectedFile.size / 1024).toFixed(1)} KB
@@ -321,8 +321,8 @@ export default function Transform() {
                       variant="outline"
                       className={
                         currentTransformation.status === "completed"
-                          ? "bg-chart-2/15 text-chart-2 border-transparent"
-                          : "bg-destructive/15 text-destructive border-transparent"
+                          ? "bg-cyan-500/15 text-cyan-400 border-transparent"
+                          : "bg-red-500/15 text-red-400 border-transparent"
                       }
                     >
                       {currentTransformation.status === "completed" ? "Success" : "Has Errors"}
@@ -346,11 +346,11 @@ export default function Transform() {
                     </div>
                     <div className="flex items-center gap-3 text-xs shrink-0">
                       <span className="flex items-center gap-1">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-chart-2" />
+                        <CheckCircle2 className="h-3.5 w-3.5 text-cyan-400" />
                         {currentTransformation.successRows} rows
                       </span>
                       <span className="flex items-center gap-1">
-                        <XCircle className="h-3.5 w-3.5 text-destructive" />
+                        <XCircle className="h-3.5 w-3.5 text-red-400" />
                         {currentTransformation.errorRows} rows
                       </span>
                     </div>
@@ -382,15 +382,15 @@ export default function Transform() {
                           <div className="flex items-center gap-1.5 shrink-0">
                             <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
                             {m.status === "matched" && m.confidence >= 0.8 ? (
-                              <CheckCircle2 className="h-3.5 w-3.5 text-chart-2" />
+                              <CheckCircle2 className="h-3.5 w-3.5 text-cyan-400" />
                             ) : m.status === "matched" ? (
-                              <AlertTriangle className="h-3.5 w-3.5 text-chart-4" />
+                              <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
                             ) : (
-                              <XCircle className="h-3.5 w-3.5 text-destructive" />
+                              <XCircle className="h-3.5 w-3.5 text-red-400" />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-primary/10 border border-primary/20 text-xs font-mono">
+                            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-cyan-500/10 border border-cyan-500/20 text-xs font-mono">
                               {m.targetColumn}
                             </div>
                           </div>
@@ -402,10 +402,10 @@ export default function Transform() {
                                     variant="outline"
                                     className={`text-[10px] ${
                                       m.confidence >= 0.8
-                                        ? "bg-chart-2/15 text-chart-2 border-transparent"
+                                        ? "bg-cyan-500/15 text-cyan-400 border-transparent"
                                         : m.confidence >= 0.5
-                                        ? "bg-chart-4/15 text-chart-4 border-transparent"
-                                        : "bg-destructive/15 text-destructive border-transparent"
+                                        ? "bg-amber-500/15 text-amber-400 border-transparent"
+                                        : "bg-red-500/15 text-red-400 border-transparent"
                                     }`}
                                   >
                                     {Math.round(m.confidence * 100)}%
@@ -451,10 +451,10 @@ export default function Transform() {
                                       variant="outline"
                                       className={
                                         m.confidence >= 0.8
-                                          ? "bg-chart-2/15 text-chart-2 border-transparent"
+                                          ? "bg-cyan-500/15 text-cyan-400 border-transparent"
                                           : m.confidence >= 0.5
-                                          ? "bg-chart-4/15 text-chart-4 border-transparent"
-                                          : "bg-destructive/15 text-destructive border-transparent"
+                                          ? "bg-amber-500/15 text-amber-400 border-transparent"
+                                          : "bg-red-500/15 text-red-400 border-transparent"
                                       }
                                     >
                                       {Math.round(m.confidence * 100)}%
@@ -465,11 +465,11 @@ export default function Transform() {
                                 </TableCell>
                                 <TableCell className="text-right">
                                   {m.status === "matched" ? (
-                                    <CheckCircle2 className="h-4 w-4 text-chart-2 inline" />
+                                    <CheckCircle2 className="h-4 w-4 text-cyan-400 inline" />
                                   ) : (
                                     <Tooltip>
                                       <TooltipTrigger>
-                                        <AlertTriangle className="h-4 w-4 text-chart-4 inline" />
+                                        <AlertTriangle className="h-4 w-4 text-amber-400 inline" />
                                       </TooltipTrigger>
                                       <TooltipContent>No matching source column found</TooltipContent>
                                     </Tooltip>
@@ -489,7 +489,7 @@ export default function Transform() {
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <XCircle className="h-4 w-4 text-destructive" />
+                      <XCircle className="h-4 w-4 text-red-400" />
                       Transformation Errors ({errors.length})
                     </CardTitle>
                   </CardHeader>
@@ -510,7 +510,7 @@ export default function Transform() {
                               <TableCell className="text-xs">{e.row}</TableCell>
                               <TableCell className="font-mono text-xs">{e.column}</TableCell>
                               <TableCell className="text-xs max-w-32 truncate">{e.value}</TableCell>
-                              <TableCell className="text-xs text-destructive">{e.error}</TableCell>
+                              <TableCell className="text-xs text-red-400">{e.error}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>

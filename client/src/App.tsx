@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
-import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -109,9 +108,8 @@ function App() {
             <div className="flex h-screen w-full">
               <AppSidebar />
               <div className="flex flex-col flex-1 min-w-0">
-                <header className="flex items-center justify-between gap-2 px-3 py-2 border-b sticky top-0 bg-background z-50">
+                <header className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border/50 sticky top-0 bg-background/95 backdrop-blur-sm z-50">
                   <HeaderBreadcrumbs />
-                  <ThemeToggle />
                 </header>
                 <main className="flex-1 overflow-auto">
                   <Router />

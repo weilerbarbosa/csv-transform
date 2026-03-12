@@ -29,12 +29,12 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-            <FileSpreadsheet className="h-4 w-4 text-primary-foreground" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-teal-600 shadow-lg shadow-cyan-500/20">
+            <FileSpreadsheet className="h-4 w-4 text-black" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold" data-testid="text-app-title">CSV Transform</h2>
-            <p className="text-xs text-muted-foreground">File Processor</p>
+            <h2 className="text-sm font-bold tracking-tight text-foreground" data-testid="text-app-title">CSV Transform</h2>
+            <p className="text-[10px] text-cyan-400/60 font-medium uppercase tracking-wider">File Processor</p>
           </div>
         </div>
       </SidebarHeader>
@@ -61,14 +61,14 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-4">
-        <Separator className="mb-3" />
+        <Separator className="mb-3 opacity-30" />
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-muted-foreground">v1.0.0</span>
+          <span className="text-[10px] text-cyan-500/40 font-mono">v1.0.0</span>
           <a
             href="https://github.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+            className="text-[10px] text-cyan-500/40 hover:text-cyan-400 transition-colors"
           >
             Docs
           </a>

@@ -257,7 +257,7 @@ export default function SftpSettings() {
                 <CardContent className="pt-6">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3 min-w-0">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 shrink-0">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-cyan-500/10 shrink-0">
                         <Server className="h-5 w-5 text-primary" />
                       </div>
                       <div className="min-w-0">
@@ -269,8 +269,8 @@ export default function SftpSettings() {
                               variant="outline"
                               className={`text-[10px] px-1.5 py-0 gap-1 ${
                                 testResult.status === "success"
-                                  ? "bg-chart-2/15 text-chart-2 border-transparent"
-                                  : "bg-destructive/15 text-destructive border-transparent"
+                                  ? "bg-cyan-500/15 text-cyan-400 border-transparent"
+                                  : "bg-destructive/15 text-red-400 border-transparent"
                               }`}
                             >
                               {testResult.status === "success" ? (
@@ -329,7 +329,7 @@ export default function SftpSettings() {
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <AlertDialogAction
                               onClick={() => deleteMutation.mutate(config.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              className="bg-destructive text-red-400-foreground hover:bg-destructive/90"
                             >
                               Delete
                             </AlertDialogAction>

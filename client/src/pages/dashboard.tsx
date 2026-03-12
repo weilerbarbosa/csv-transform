@@ -105,35 +105,35 @@ export default function Dashboard() {
         <StatCard
           title="Templates"
           value={stats.totalTemplates}
-          icon={<FileSpreadsheet className="h-4 w-4 text-muted-foreground" />}
+          icon={<FileSpreadsheet className="h-4 w-4 text-cyan-400" />}
           loading={isLoading}
           testId="stat-templates"
         />
         <StatCard
           title="Transformations"
           value={stats.totalTransformations}
-          icon={<Upload className="h-4 w-4 text-muted-foreground" />}
+          icon={<Upload className="h-4 w-4 text-cyan-400" />}
           loading={isLoading}
           testId="stat-transformations"
         />
         <StatCard
           title="Successful"
           value={stats.successful}
-          icon={<CheckCircle2 className="h-4 w-4 text-chart-2" />}
+          icon={<CheckCircle2 className="h-4 w-4 text-emerald-400" />}
           loading={isLoading}
           testId="stat-successful"
         />
         <StatCard
           title="Failed"
           value={stats.failed}
-          icon={<XCircle className="h-4 w-4 text-destructive" />}
+          icon={<XCircle className="h-4 w-4 text-red-400" />}
           loading={isLoading}
           testId="stat-failed"
         />
         <StatCard
           title="Pending"
           value={stats.pending}
-          icon={<Clock className="h-4 w-4 text-chart-4" />}
+          icon={<Clock className="h-4 w-4 text-amber-400" />}
           loading={isLoading}
           testId="stat-pending"
         />
@@ -156,21 +156,21 @@ export default function Dashboard() {
                 </div>
                 <div className="h-3 bg-muted rounded-full overflow-hidden flex">
                   <div
-                    className="h-full bg-chart-2 rounded-l-full transition-all duration-500"
+                    className="h-full bg-emerald-500 rounded-l-full transition-all duration-500"
                     style={{ width: `${successPct}%` }}
                   />
                   <div
-                    className="h-full bg-destructive transition-all duration-500"
+                    className="h-full bg-red-500 transition-all duration-500"
                     style={{ width: `${100 - successPct}%` }}
                   />
                 </div>
                 <div className="flex items-center gap-4 mt-2">
                   <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="inline-block h-2 w-2 rounded-full bg-chart-2" />
+                    <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
                     Successful ({stats.successful})
                   </span>
                   <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="inline-block h-2 w-2 rounded-full bg-destructive" />
+                    <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
                     Failed ({stats.failed})
                   </span>
                 </div>
@@ -318,12 +318,12 @@ function StatCard({
 
 function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, { label: string; className: string }> = {
-    completed: { label: "Success", className: "bg-chart-2/15 text-chart-2 border-transparent" },
-    success: { label: "Success", className: "bg-chart-2/15 text-chart-2 border-transparent" },
-    error: { label: "Error", className: "bg-destructive/15 text-destructive border-transparent" },
-    failed: { label: "Failed", className: "bg-destructive/15 text-destructive border-transparent" },
-    pending: { label: "Pending", className: "bg-chart-4/15 text-chart-4 border-transparent" },
-    processing: { label: "Processing", className: "bg-primary/15 text-primary border-transparent" },
+    completed: { label: "Success", className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" },
+    success: { label: "Success", className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20" },
+    error: { label: "Error", className: "bg-red-500/15 text-red-400 border-red-500/20" },
+    failed: { label: "Failed", className: "bg-red-500/15 text-red-400 border-red-500/20" },
+    pending: { label: "Pending", className: "bg-amber-500/15 text-amber-400 border-amber-500/20" },
+    processing: { label: "Processing", className: "bg-cyan-500/15 text-cyan-400 border-cyan-500/20" },
   };
   const v = variants[status] || { label: status, className: "" };
   return (

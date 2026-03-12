@@ -176,7 +176,7 @@ export default function Templates() {
                     isDragActive
                       ? "border-primary bg-primary/5"
                       : selectedFile
-                      ? "border-chart-2 bg-chart-2/5"
+                      ? "border-cyan-500 bg-cyan-500/5"
                       : "border-border"
                   }`}
                   data-testid="dropzone-template"
@@ -184,7 +184,7 @@ export default function Templates() {
                   <input {...getInputProps()} />
                   {selectedFile ? (
                     <div className="flex flex-col items-center gap-2">
-                      <FileSpreadsheet className="h-8 w-8 text-chart-2" />
+                      <FileSpreadsheet className="h-8 w-8 text-cyan-400" />
                       <p className="text-sm font-medium">{selectedFile.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {(selectedFile.size / 1024).toFixed(1)} KB
@@ -245,7 +245,7 @@ export default function Templates() {
               <Card key={template.id} data-testid={`card-template-${template.id}`}>
                 <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 shrink-0">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-cyan-500/10 shrink-0">
                       <FileSpreadsheet className="h-4 w-4 text-primary" />
                     </div>
                     <CardTitle className="text-sm font-medium truncate">{template.name}</CardTitle>
@@ -272,7 +272,7 @@ export default function Templates() {
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => deleteMutation.mutate(template.id)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          className="bg-destructive text-red-400-foreground hover:bg-destructive/90"
                         >
                           Delete
                         </AlertDialogAction>

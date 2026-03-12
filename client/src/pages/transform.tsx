@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDropzone } from "react-dropzone";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,8 +39,50 @@ import {
   ArrowRight,
   Download,
   RotateCw,
+  RefreshCcw,
+  Columns3,
 } from "lucide-react";
 import type { Template, Transformation, ColumnMapping, TransformationError } from "@shared/schema";
+
+function StepIndicator({ currentStep }: { currentStep: number }) {
+  const steps = [
+    { num: 1, label: "Select Template" },
+    { num: 2, label: "Upload File" },
+    { num: 3, label: "Review Results" },
+  ];
+
+  return (
+    <div className="flex items-center justify-center gap-0">
+      {steps.map((step, i) => {
+        const isActive = currentStep === step.num;
+        const isDone = currentStep > step.num;
+        return (
+          <div key={step.num} className="flex items-center">
+            {i > 0 && (
+              <div className={`w-8 sm:w-12 h-0.5 ${isDone ? "bg-primary" : "bg-muted"}`} />
+            )}
+            <div className="flex flex-col items-center gap-1">
+              <div
+                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium transition-colors ${
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : isDone
+                    ? "bg-primary/20 text-primary"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {isDone ? <CheckCircle2 className="h-4 w-4" /> : step.num}
+              </div>
+              <span className={`text-[10px] sm:text-xs whitespace-nowrap ${isActive ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                {step.label}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function Transform() {
   const { toast } = useToast();
@@ -101,12 +143,26 @@ export default function Transform() {
     window.open(`/api/transformations/${currentTransformation.id}/download`, "_blank");
   };
 
+  const resetForm = () => {
+    setSelectedTemplateId("");
+    setSelectedFile(null);
+    setCurrentTransformation(null);
+  };
+
+  const selectedTemplate = useMemo(() => {
+    if (!selectedTemplateId || !templates) return null;
+    return templates.find((t) => String(t.id) === selectedTemplateId) || null;
+  }, [selectedTemplateId, templates]);
+
   const mappings = currentTransformation?.columnMappings as ColumnMapping[] | null;
   const errors = currentTransformation?.errors as TransformationError[] | null;
   const successRate =
     currentTransformation && currentTransformation.totalRows
       ? Math.round(((currentTransformation.successRows ?? 0) / currentTransformation.totalRows) * 100)
       : 0;
+
+  // Determine current step
+  const currentStep = currentTransformation ? 3 : selectedFile && selectedTemplateId ? 2 : 1;
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -116,6 +172,13 @@ export default function Transform() {
           Upload a file and let AI match columns to your target template
         </p>
       </div>
+
+      {/* Step Indicator */}
+      <Card>
+        <CardContent className="py-4">
+          <StepIndicator currentStep={currentStep} />
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1 space-y-4">
@@ -129,7 +192,7 @@ export default function Transform() {
                 {loadingTemplates ? (
                   <Skeleton className="h-9 w-full" />
                 ) : templates && templates.length > 0 ? (
-                  <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                  <Select value={selectedTemplateId} onValueChange={(v) => { setSelectedTemplateId(v); setCurrentTransformation(null); }}>
                     <SelectTrigger data-testid="select-template">
                       <SelectValue placeholder="Select a template" />
                     </SelectTrigger>
@@ -147,6 +210,23 @@ export default function Transform() {
                   </p>
                 )}
               </div>
+
+              {/* Template column preview */}
+              {selectedTemplate && (
+                <div className="rounded-md border p-3 bg-muted/30">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Columns3 className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-medium">Target columns ({selectedTemplate.columns.length})</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedTemplate.columns.map((col) => (
+                      <Badge key={col} variant="secondary" className="text-[10px] px-1.5 py-0">
+                        {col}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Source File</Label>
@@ -200,6 +280,18 @@ export default function Transform() {
                   </>
                 )}
               </Button>
+
+              {/* Transform Another button */}
+              {currentTransformation && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={resetForm}
+                >
+                  <RefreshCcw className="h-4 w-4 mr-2" />
+                  Transform Another
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -272,28 +364,89 @@ export default function Transform() {
                     <CardTitle className="text-sm font-medium">Column Mapping (AI-Powered)</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Source Column</TableHead>
-                          <TableHead className="w-10"></TableHead>
-                          <TableHead>Target Column</TableHead>
-                          <TableHead className="text-right">Confidence</TableHead>
-                          <TableHead className="text-right">Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {mappings.map((m, i) => (
-                          <TableRow key={i} data-testid={`row-mapping-${i}`}>
-                            <TableCell className="font-mono text-xs">{m.sourceColumn || "—"}</TableCell>
-                            <TableCell>
-                              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">{m.targetColumn}</TableCell>
-                            <TableCell className="text-right">
-                              {m.status === "matched" ? (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
+                    {/* Visual mapping flow */}
+                    <div className="space-y-2 mb-4">
+                      {mappings.map((m, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2 p-2 rounded-md bg-muted/40"
+                          data-testid={`row-mapping-${i}`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-mono ${
+                              m.status === "matched" ? "bg-background border" : "bg-destructive/10 border border-destructive/20"
+                            }`}>
+                              {m.sourceColumn || "No match"}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                            {m.status === "matched" && m.confidence >= 0.8 ? (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-chart-2" />
+                            ) : m.status === "matched" ? (
+                              <AlertTriangle className="h-3.5 w-3.5 text-chart-4" />
+                            ) : (
+                              <XCircle className="h-3.5 w-3.5 text-destructive" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-primary/10 border border-primary/20 text-xs font-mono">
+                              {m.targetColumn}
+                            </div>
+                          </div>
+                          <div className="shrink-0 w-14 text-right">
+                            {m.status === "matched" ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-[10px] ${
+                                      m.confidence >= 0.8
+                                        ? "bg-chart-2/15 text-chart-2 border-transparent"
+                                        : m.confidence >= 0.5
+                                        ? "bg-chart-4/15 text-chart-4 border-transparent"
+                                        : "bg-destructive/15 text-destructive border-transparent"
+                                    }`}
+                                  >
+                                    {Math.round(m.confidence * 100)}%
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>AI confidence score</TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">--</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Table fallback for detail */}
+                    <details className="group">
+                      <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+                        Show detailed table view
+                      </summary>
+                      <div className="mt-2">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Source Column</TableHead>
+                              <TableHead className="w-10"></TableHead>
+                              <TableHead>Target Column</TableHead>
+                              <TableHead className="text-right">Confidence</TableHead>
+                              <TableHead className="text-right">Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {mappings.map((m, i) => (
+                              <TableRow key={i}>
+                                <TableCell className="font-mono text-xs">{m.sourceColumn || "--"}</TableCell>
+                                <TableCell>
+                                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                </TableCell>
+                                <TableCell className="font-mono text-xs">{m.targetColumn}</TableCell>
+                                <TableCell className="text-right">
+                                  {m.status === "matched" ? (
                                     <Badge
                                       variant="outline"
                                       className={
@@ -306,29 +459,28 @@ export default function Transform() {
                                     >
                                       {Math.round(m.confidence * 100)}%
                                     </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent>AI confidence score</TooltipContent>
-                                </Tooltip>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {m.status === "matched" ? (
-                                <CheckCircle2 className="h-4 w-4 text-chart-2 inline" />
-                              ) : (
-                                <Tooltip>
-                                  <TooltipTrigger>
-                                    <AlertTriangle className="h-4 w-4 text-chart-4 inline" />
-                                  </TooltipTrigger>
-                                  <TooltipContent>No matching source column found</TooltipContent>
-                                </Tooltip>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">--</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {m.status === "matched" ? (
+                                    <CheckCircle2 className="h-4 w-4 text-chart-2 inline" />
+                                  ) : (
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <AlertTriangle className="h-4 w-4 text-chart-4 inline" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>No matching source column found</TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </details>
                   </CardContent>
                 </Card>
               )}
@@ -405,7 +557,7 @@ export default function Transform() {
                                       key={j}
                                       className="text-xs max-w-40 truncate whitespace-nowrap"
                                     >
-                                      {val || "—"}
+                                      {val || "--"}
                                     </TableCell>
                                   ))}
                                 </TableRow>

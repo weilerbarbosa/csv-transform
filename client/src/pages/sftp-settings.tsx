@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Form,
@@ -23,12 +24,23 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Alert,
   AlertDescription,
 } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Trash2, Server, Plug, CheckCircle2, XCircle, RotateCw } from "lucide-react";
+import { Plus, Trash2, Server, Plug, CheckCircle2, XCircle, RotateCw, Wifi, WifiOff } from "lucide-react";
 import type { SftpConfig } from "@shared/schema";
 
 const sftpFormSchema = z.object({
@@ -45,7 +57,7 @@ type SftpFormValues = z.infer<typeof sftpFormSchema>;
 export default function SftpSettings() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [testResult, setTestResult] = useState<{ id: number; status: string; message: string } | null>(null);
+  const [testResults, setTestResults] = useState<Map<number, { status: string; message: string }>>(new Map());
 
   const { data: configs, isLoading } = useQuery<SftpConfig[]>({
     queryKey: ["/api/sftp-configs"],
@@ -83,8 +95,13 @@ export default function SftpSettings() {
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/sftp-configs/${id}`);
     },
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sftp-configs"] });
+      setTestResults((prev) => {
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
       toast({ title: "Server removed" });
     },
     onError: (err: Error) => {
@@ -98,10 +115,10 @@ export default function SftpSettings() {
       return res.json();
     },
     onSuccess: (data, id) => {
-      setTestResult({ id, status: "success", message: data.message || "Connection successful!" });
+      setTestResults((prev) => new Map(prev).set(id, { status: "success", message: data.message || "Connection successful!" }));
     },
     onError: (err: Error, id) => {
-      setTestResult({ id, status: "error", message: err.message });
+      setTestResults((prev) => new Map(prev).set(id, { status: "error", message: err.message }));
     },
   });
 
@@ -233,71 +250,113 @@ export default function SftpSettings() {
         </div>
       ) : configs && configs.length > 0 ? (
         <div className="space-y-4">
-          {configs.map((config) => (
-            <Card key={config.id} data-testid={`card-sftp-${config.id}`}>
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 shrink-0">
-                      <Server className="h-5 w-5 text-primary" />
+          {configs.map((config) => {
+            const testResult = testResults.get(config.id);
+            return (
+              <Card key={config.id} data-testid={`card-sftp-${config.id}`}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 shrink-0">
+                        <Server className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-semibold">{config.name}</h3>
+                          {/* Connection status indicator */}
+                          {testResult && (
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] px-1.5 py-0 gap-1 ${
+                                testResult.status === "success"
+                                  ? "bg-chart-2/15 text-chart-2 border-transparent"
+                                  : "bg-destructive/15 text-destructive border-transparent"
+                              }`}
+                            >
+                              {testResult.status === "success" ? (
+                                <Wifi className="h-2.5 w-2.5" />
+                              ) : (
+                                <WifiOff className="h-2.5 w-2.5" />
+                              )}
+                              {testResult.status === "success" ? "Connected" : "Failed"}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {config.host}:{config.port} &middot; {config.username} &middot; {config.remotePath}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Added {new Date(config.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <h3 className="text-sm font-semibold">{config.name}</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {config.host}:{config.port} &middot; {config.username} &middot; {config.remotePath}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Added {new Date(config.createdAt).toLocaleDateString()}
-                      </p>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          testMutation.mutate(config.id);
+                        }}
+                        disabled={testMutation.isPending}
+                        data-testid={`button-test-sftp-${config.id}`}
+                      >
+                        {testMutation.isPending && testMutation.variables === config.id ? (
+                          <RotateCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <Plug className="h-3.5 w-3.5 mr-1.5" />
+                        )}
+                        Test
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            disabled={deleteMutation.isPending}
+                            data-testid={`button-delete-sftp-${config.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete SFTP server?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently remove the "{config.name}" ({config.host}) connection. Any future uploads using this server will need a new configuration.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteMutation.mutate(config.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setTestResult(null);
-                        testMutation.mutate(config.id);
-                      }}
-                      disabled={testMutation.isPending}
-                      data-testid={`button-test-sftp-${config.id}`}
+                  {testResult && (
+                    <Alert
+                      variant={testResult.status === "success" ? "default" : "destructive"}
+                      className="mt-3"
                     >
-                      {testMutation.isPending && testMutation.variables === config.id ? (
-                        <RotateCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      {testResult.status === "success" ? (
+                        <CheckCircle2 className="h-4 w-4" />
                       ) : (
-                        <Plug className="h-3.5 w-3.5 mr-1.5" />
+                        <XCircle className="h-4 w-4" />
                       )}
-                      Test
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => deleteMutation.mutate(config.id)}
-                      disabled={deleteMutation.isPending}
-                      data-testid={`button-delete-sftp-${config.id}`}
-                    >
-                      <Trash2 className="h-4 w-4 text-muted-foreground" />
-                    </Button>
-                  </div>
-                </div>
-                {testResult && testResult.id === config.id && (
-                  <Alert
-                    variant={testResult.status === "success" ? "default" : "destructive"}
-                    className="mt-3"
-                  >
-                    {testResult.status === "success" ? (
-                      <CheckCircle2 className="h-4 w-4" />
-                    ) : (
-                      <XCircle className="h-4 w-4" />
-                    )}
-                    <AlertDescription className="text-xs">
-                      {testResult.message}
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                      <AlertDescription className="text-xs">
+                        {testResult.message}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <Card>

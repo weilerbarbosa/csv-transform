@@ -1,9 +1,37 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileSpreadsheet, CheckCircle2, XCircle, Clock, Upload } from "lucide-react";
+import {
+  FileSpreadsheet,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Upload,
+  Plus,
+  Sparkles,
+  FolderUp,
+  ArrowRight,
+} from "lucide-react";
 import type { Transformation, Template, UploadLog } from "@shared/schema";
+
+function relativeTime(dateStr: string | Date): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+
+  if (diffSec < 60) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHr < 24) return `${diffHr}h ago`;
+  if (diffDay < 7) return `${diffDay}d ago`;
+  return new Date(dateStr).toLocaleDateString();
+}
 
 export default function Dashboard() {
   const { data: transformations, isLoading: loadingTransformations } = useQuery<Transformation[]>({
@@ -29,6 +57,14 @@ export default function Dashboard() {
 
   const isLoading = loadingTransformations || loadingTemplates || loadingUploads;
 
+  // Build a template lookup map
+  const templateMap = new Map<number, Template>();
+  templates?.forEach((t) => templateMap.set(t.id, t));
+
+  // Success rate visual
+  const totalDone = stats.successful + stats.failed;
+  const successPct = totalDone > 0 ? Math.round((stats.successful / totalDone) * 100) : 0;
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div>
@@ -36,7 +72,36 @@ export default function Dashboard() {
         <p className="text-muted-foreground text-sm mt-1">Overview of your file transformations and uploads</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/templates">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Plus className="h-3.5 w-3.5" />
+                Create Template
+              </Button>
+            </Link>
+            <Link href="/transform">
+              <Button variant="outline" size="sm" className="gap-2">
+                <Sparkles className="h-3.5 w-3.5" />
+                Transform File
+              </Button>
+            </Link>
+            <Link href="/sftp">
+              <Button variant="outline" size="sm" className="gap-2">
+                <FolderUp className="h-3.5 w-3.5" />
+                Upload to SFTP
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           title="Templates"
           value={stats.totalTemplates}
@@ -65,12 +130,67 @@ export default function Dashboard() {
           loading={isLoading}
           testId="stat-failed"
         />
+        <StatCard
+          title="Pending"
+          value={stats.pending}
+          icon={<Clock className="h-4 w-4 text-chart-4" />}
+          loading={isLoading}
+          testId="stat-pending"
+        />
       </div>
+
+      {/* Success Rate Visual */}
+      {!isLoading && totalDone > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Transformation Success Rate</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-muted-foreground">
+                    {stats.successful} successful / {totalDone} total
+                  </span>
+                  <span className="text-sm font-semibold">{successPct}%</span>
+                </div>
+                <div className="h-3 bg-muted rounded-full overflow-hidden flex">
+                  <div
+                    className="h-full bg-chart-2 rounded-l-full transition-all duration-500"
+                    style={{ width: `${successPct}%` }}
+                  />
+                  <div
+                    className="h-full bg-destructive transition-all duration-500"
+                    style={{ width: `${100 - successPct}%` }}
+                  />
+                </div>
+                <div className="flex items-center gap-4 mt-2">
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="inline-block h-2 w-2 rounded-full bg-chart-2" />
+                    Successful ({stats.successful})
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="inline-block h-2 w-2 rounded-full bg-destructive" />
+                    Failed ({stats.failed})
+                  </span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Recent Transformations</CardTitle>
+            {transformations && transformations.length > 0 && (
+              <Link href="/transform">
+                <Button variant="ghost" size="sm" className="text-xs gap-1 h-7">
+                  View all <ArrowRight className="h-3 w-3" />
+                </Button>
+              </Link>
+            )}
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -81,24 +201,35 @@ export default function Dashboard() {
               </div>
             ) : transformations && transformations.length > 0 ? (
               <div className="space-y-3">
-                {transformations.slice(0, 5).map((t) => (
-                  <div
-                    key={t.id}
-                    className="flex items-center justify-between gap-2 p-3 rounded-md bg-muted/50"
-                    data-testid={`row-transformation-${t.id}`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <FileSpreadsheet className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{t.originalFileName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {t.successRows}/{t.totalRows} rows
-                        </p>
+                {transformations.slice(0, 5).map((t) => {
+                  const tpl = templateMap.get(t.templateId);
+                  return (
+                    <div
+                      key={t.id}
+                      className="flex items-center justify-between gap-2 p-3 rounded-md bg-muted/50 hover:bg-muted/80 transition-colors"
+                      data-testid={`row-transformation-${t.id}`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <FileSpreadsheet className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{t.originalFileName}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            {tpl && (
+                              <>
+                                <span className="truncate max-w-[120px]">{tpl.name}</span>
+                                <span>&middot;</span>
+                              </>
+                            )}
+                            <span>{t.successRows}/{t.totalRows} rows</span>
+                            <span>&middot;</span>
+                            <span>{relativeTime(t.createdAt)}</span>
+                          </div>
+                        </div>
                       </div>
+                      <StatusBadge status={t.status} />
                     </div>
-                    <StatusBadge status={t.status} />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <EmptyState message="No transformations yet" icon={<Upload className="h-8 w-8 text-muted-foreground" />} />
@@ -109,6 +240,13 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Recent SFTP Uploads</CardTitle>
+            {uploads && uploads.length > 0 && (
+              <Link href="/sftp">
+                <Button variant="ghost" size="sm" className="text-xs gap-1 h-7">
+                  View all <ArrowRight className="h-3 w-3" />
+                </Button>
+              </Link>
+            )}
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -122,15 +260,15 @@ export default function Dashboard() {
                 {uploads.slice(0, 5).map((u) => (
                   <div
                     key={u.id}
-                    className="flex items-center justify-between gap-2 p-3 rounded-md bg-muted/50"
+                    className="flex items-center justify-between gap-2 p-3 rounded-md bg-muted/50 hover:bg-muted/80 transition-colors"
                     data-testid={`row-upload-${u.id}`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <Upload className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <FolderUp className="h-4 w-4 text-muted-foreground shrink-0" />
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{u.fileName}</p>
                         <p className="text-xs text-muted-foreground">
-                          {new Date(u.createdAt).toLocaleDateString()}
+                          {relativeTime(u.createdAt)}
                         </p>
                       </div>
                     </div>

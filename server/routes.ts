@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 import Papa from "papaparse";
 import OpenAI from "openai";
 import SftpClient from "ssh2-sftp-client";
-import { insertSftpConfigSchema, type ColumnMapping, type TransformationError } from "@shared/schema";
+import { insertSftpConfigSchema, type ColumnMapping, type TransformationError, TRANSFORMATION_STATUSES, UPLOAD_LOG_STATUSES } from "@shared/schema";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
@@ -65,7 +65,9 @@ export async function registerRoutes(
 
   app.get("/api/templates/:id", async (req, res) => {
     try {
-      const template = await storage.getTemplate(parseInt(req.params.id));
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid template ID" });
+      const template = await storage.getTemplate(id);
       if (!template) return res.status(404).json({ error: "Template not found" });
       res.json(template);
     } catch (error) {
@@ -108,7 +110,7 @@ export async function registerRoutes(
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
       const templateId = parseInt(req.body.templateId);
-      if (!templateId) return res.status(400).json({ error: "Template ID is required" });
+      if (isNaN(templateId) || templateId <= 0) return res.status(400).json({ error: "Template ID must be a valid positive number" });
 
       const template = await storage.getTemplate(templateId);
       if (!template) return res.status(404).json({ error: "Template not found" });
@@ -139,21 +141,34 @@ export async function registerRoutes(
         const prompt = `You are a data mapping expert. I need to map source CSV columns to target CSV columns.
 
 Source columns: ${JSON.stringify(sourceHeaders)}
-Sample source data (first few rows): ${JSON.stringify(sampleSourceRows)}
+Sample source data (first 5 rows): ${JSON.stringify(sampleSourceRows)}
 
 Target columns: ${JSON.stringify(targetColumns)}
 ${template.sampleData ? `Sample target data: ${JSON.stringify(template.sampleData)}` : ""}
 
-For each TARGET column, find the best matching SOURCE column. Return a JSON object with a "mappings" key containing an array.
+For each TARGET column, find the best matching SOURCE column. Follow these rules:
 
-Each mapping object should have:
-- "sourceColumn": the source column name that best matches (or empty string if no match)
-- "targetColumn": the target column name
-- "confidence": a number from 0 to 1 indicating how confident you are in the match
-- "status": "matched" if a good match was found, "unmatched" if no match
+1. **Data type inference**: Analyze the sample values to infer data types (numbers, dates, emails, phone numbers, URLs, booleans, currency, percentages, etc.). Prefer matches where source and target data types align.
 
-Consider column names, data types, sample values, and semantic meaning when matching.
-Return ONLY JSON in the format: {"mappings": [...]}`;
+2. **Partial name matches and abbreviations**: Consider partial matches, common abbreviations, and synonyms. For example:
+   - "fname" or "first_name" should match "First Name"
+   - "qty" should match "Quantity"
+   - "addr" should match "Address"
+   - "DOB" should match "Date of Birth"
+   - "tel" or "ph" should match "Phone"
+
+3. **Similar column disambiguation**: When multiple source columns have similar names (e.g., "Address 1" vs "Address 2", "Ship City" vs "Bill City"), use the sample data values and context to determine the best match for each target column.
+
+4. **Semantic matching**: Consider the meaning behind column names, not just string similarity. "Revenue" and "Total Sales" may refer to the same concept.
+
+Return a JSON object with a "mappings" key containing an array. Each mapping object must have:
+- "sourceColumn": the exact source column name that best matches (or empty string if no match found)
+- "targetColumn": the exact target column name
+- "confidence": a number from 0 to 1 indicating match confidence (1.0 = exact name match with matching data types, 0.7+ = strong semantic match, 0.4-0.7 = partial/abbreviated match, below 0.4 = weak guess)
+- "status": "matched" if a reasonable match was found (confidence >= 0.3), "unmatched" if no match
+- "reason": a brief explanation (1 sentence) of why this mapping was chosen, or why no match was found
+
+Return ONLY valid JSON in the format: {"mappings": [...]}`;
 
         const aiResponse = await openai.chat.completions.create({
           model: "gpt-5-mini",
@@ -166,7 +181,8 @@ Return ONLY JSON in the format: {"mappings": [...]}`;
         let parsedResponse: any;
         try {
           parsedResponse = JSON.parse(responseText);
-        } catch {
+        } catch (parseError) {
+          console.error("AI returned invalid JSON. Raw response:", responseText.substring(0, 500));
           parsedResponse = { mappings: [] };
         }
 
@@ -185,6 +201,9 @@ Return ONLY JSON in the format: {"mappings": [...]}`;
               break;
             }
           }
+          if (rawMappings.length === 0) {
+            console.warn("AI response had unexpected structure. Keys found:", keys, "Full response:", JSON.stringify(parsedResponse).substring(0, 500));
+          }
         }
 
         const validMappings: ColumnMapping[] = targetColumns.map((targetCol) => {
@@ -195,12 +214,14 @@ Return ONLY JSON in the format: {"mappings": [...]}`;
               m.targetcolumn === targetCol
           );
           const srcCol = found?.sourceColumn || found?.source_column || found?.sourcecolumn || "";
+          const reason = found?.reason || undefined;
           if (found && srcCol && sourceHeaders.includes(srcCol)) {
             return {
               sourceColumn: srcCol,
               targetColumn: targetCol,
               confidence: typeof found.confidence === "number" ? found.confidence : 0.5,
               status: "matched" as const,
+              reason,
             };
           }
           return {
@@ -208,6 +229,7 @@ Return ONLY JSON in the format: {"mappings": [...]}`;
             targetColumn: targetCol,
             confidence: 0,
             status: "unmatched" as const,
+            reason: reason || `No matching source column found for "${targetCol}"`,
           };
         });
 
@@ -228,18 +250,23 @@ Return ONLY JSON in the format: {"mappings": [...]}`;
 
         const hasUnmatched = unmatchedColumns.length > 0;
 
+        const matchedMappings = validMappings.filter((m) => m.status === "matched");
+
         for (let i = 0; i < sourceRows.length; i++) {
           const sourceRow = sourceRows[i];
           const outputRow: Record<string, string> = {};
-          let rowHasDataError = false;
+          let allTargetColumnsEmpty = true;
+          let matchedColumnHasEmpty = false;
 
           for (const mapping of validMappings) {
             if (mapping.status === "matched" && mapping.sourceColumn) {
               const value = sourceRow[mapping.sourceColumn];
               if (value !== undefined && value !== null && String(value).trim() !== "") {
                 outputRow[mapping.targetColumn] = String(value);
+                allTargetColumnsEmpty = false;
               } else {
                 outputRow[mapping.targetColumn] = "";
+                matchedColumnHasEmpty = true;
               }
             } else {
               outputRow[mapping.targetColumn] = "";
@@ -247,8 +274,18 @@ Return ONLY JSON in the format: {"mappings": [...]}`;
           }
 
           outputRows.push(outputRow);
-          if (rowHasDataError) {
+
+          // Count as error if all target columns are empty, or if any matched column has empty value
+          if (allTargetColumnsEmpty || (matchedMappings.length > 0 && matchedColumnHasEmpty)) {
             errorCount++;
+            if (allTargetColumnsEmpty) {
+              errors.push({
+                row: i + 1,
+                column: "",
+                value: "",
+                error: "All target columns are empty for this row",
+              });
+            }
           } else {
             successCount++;
           }
@@ -287,7 +324,10 @@ Return ONLY JSON in the format: {"mappings": [...]}`;
 
   app.get("/api/transformations", async (req, res) => {
     try {
-      const data = await storage.getTransformations();
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
+      const pagination = (limit !== undefined || offset !== undefined) ? { limit, offset } : undefined;
+      const data = await storage.getTransformations(pagination);
       res.json(data);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch transformations" });
@@ -306,18 +346,33 @@ Return ONLY JSON in the format: {"mappings": [...]}`;
 
   app.get("/api/transformations/:id/download", async (req, res) => {
     try {
-      const t = await storage.getTransformation(parseInt(req.params.id));
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid transformation ID" });
+      const t = await storage.getTransformation(id);
       if (!t) return res.status(404).json({ error: "Not found" });
       if (!t.outputData) return res.status(400).json({ error: "No output data" });
 
       const template = await storage.getTemplate(t.templateId);
       const columns = template?.columns as string[] || Object.keys((t.outputData as Record<string, string>[])[0] || {});
-      const csv = rowsToCSV(t.outputData as Record<string, string>[], columns);
+      const outputRows = t.outputData as Record<string, string>[];
+      const format = (req.query.format as string)?.toLowerCase();
+      const baseName = t.originalFileName.replace(/\.(xlsx?|csv)$/i, "") + "_transformed";
 
-      const filename = t.originalFileName.replace(/\.(xlsx?|csv)$/i, "") + "_transformed.csv";
-      res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-      res.send(csv);
+      if (format === "xlsx") {
+        const ws = XLSX.utils.json_to_sheet(outputRows, { header: columns });
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Transformed");
+        const xlsxBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        res.setHeader("Content-Disposition", `attachment; filename="${baseName}.xlsx"`);
+        res.send(xlsxBuffer);
+      } else {
+        const csv = rowsToCSV(outputRows, columns);
+        res.setHeader("Content-Type", "text/csv");
+        res.setHeader("Content-Disposition", `attachment; filename="${baseName}.csv"`);
+        res.send(csv);
+      }
     } catch (error) {
       res.status(500).json({ error: "Failed to download" });
     }
@@ -441,10 +496,49 @@ Return ONLY JSON in the format: {"mappings": [...]}`;
 
   app.get("/api/upload-logs", async (req, res) => {
     try {
-      const logs = await storage.getUploadLogs();
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
+      const pagination = (limit !== undefined || offset !== undefined) ? { limit, offset } : undefined;
+      const logs = await storage.getUploadLogs(pagination);
       res.json(logs);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch logs" });
+    }
+  });
+
+  // Template Preview: returns columns and sample data formatted for display
+  app.get("/api/templates/:id/preview", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid template ID" });
+
+      const template = await storage.getTemplate(id);
+      if (!template) return res.status(404).json({ error: "Template not found" });
+
+      const columns = template.columns as string[];
+      const sampleData = (template.sampleData as Record<string, string>[]) || [];
+
+      res.json({
+        id: template.id,
+        name: template.name,
+        columns,
+        sampleRows: sampleData,
+        totalColumns: columns.length,
+        totalSampleRows: sampleData.length,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch template preview" });
+    }
+  });
+
+  // Transformation Stats: aggregate statistics for dashboard
+  app.get("/api/stats", async (req, res) => {
+    try {
+      const stats = await storage.getStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+      res.status(500).json({ error: "Failed to fetch statistics" });
     }
   });
 

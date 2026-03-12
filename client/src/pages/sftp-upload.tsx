@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,9 @@ import {
   RotateCw,
   Server,
   AlertCircle,
+  Settings,
+  FileSpreadsheet,
+  ArrowRight,
 } from "lucide-react";
 import type { Transformation, SftpConfig, UploadLog } from "@shared/schema";
 
@@ -86,6 +90,17 @@ export default function SftpUpload() {
   });
 
   const completedTransformations = transformations?.filter((t) => t.status === "completed") ?? [];
+
+  // Get selected items for preview
+  const selectedTransformation = useMemo(() => {
+    if (!selectedTransformationId || !transformations) return null;
+    return transformations.find((t) => String(t.id) === selectedTransformationId) || null;
+  }, [selectedTransformationId, transformations]);
+
+  const selectedSftpConfig = useMemo(() => {
+    if (!selectedSftpId || !sftpConfigs) return null;
+    return sftpConfigs.find((s) => String(s.id) === selectedSftpId) || null;
+  }, [selectedSftpId, sftpConfigs]);
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -145,11 +160,53 @@ export default function SftpUpload() {
                     </SelectContent>
                   </Select>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
-                    No SFTP servers configured. Add one in Settings.
-                  </p>
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      No SFTP servers configured.
+                    </p>
+                    <Link href="/sftp-settings">
+                      <Button variant="outline" size="sm" className="w-full gap-2">
+                        <Settings className="h-3.5 w-3.5" />
+                        Go to SFTP Settings
+                      </Button>
+                    </Link>
+                  </div>
                 )}
               </div>
+
+              {/* Preview selected items before upload */}
+              {(selectedTransformation || selectedSftpConfig) && (
+                <div className="rounded-md border p-3 bg-muted/30 space-y-3">
+                  <span className="text-xs font-medium text-muted-foreground">Upload Summary</span>
+                  {selectedTransformation && (
+                    <div className="flex items-start gap-2">
+                      <FileSpreadsheet className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium truncate">{selectedTransformation.originalFileName}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {selectedTransformation.successRows} rows &middot; {selectedTransformation.status}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {selectedTransformation && selectedSftpConfig && (
+                    <div className="flex justify-center">
+                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
+                  )}
+                  {selectedSftpConfig && (
+                    <div className="flex items-start gap-2">
+                      <Server className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium truncate">{selectedSftpConfig.name}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {selectedSftpConfig.host}:{selectedSftpConfig.port} &middot; {selectedSftpConfig.remotePath}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <Button
                 className="w-full"
@@ -243,7 +300,7 @@ export default function SftpUpload() {
                             {new Date(log.createdAt).toLocaleString()}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground max-w-48 truncate">
-                            {log.errorMessage || "—"}
+                            {log.errorMessage || "--"}
                           </TableCell>
                         </TableRow>
                       ))}

@@ -106,11 +106,18 @@ export const insertUploadLogSchema = createInsertSchema(uploadLogs).omit({
 export type UploadLog = typeof uploadLogs.$inferSelect;
 export type InsertUploadLog = z.infer<typeof insertUploadLogSchema>;
 
+export const TRANSFORMATION_STATUSES = ["pending", "processing", "completed", "error"] as const;
+export type TransformationStatus = (typeof TRANSFORMATION_STATUSES)[number];
+
+export const UPLOAD_LOG_STATUSES = ["pending", "success", "error"] as const;
+export type UploadLogStatus = (typeof UPLOAD_LOG_STATUSES)[number];
+
 export interface ColumnMapping {
   sourceColumn: string;
   targetColumn: string;
   confidence: number;
   status: "matched" | "unmatched" | "manual";
+  reason?: string;
 }
 
 export interface TransformationError {

@@ -10,7 +10,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -58,6 +60,20 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="p-4">
+        <Separator className="mb-3" />
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-muted-foreground">v1.0.0</span>
+          <a
+            href="https://github.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Docs
+          </a>
+        </div>
+      </SidebarFooter>
     </Sidebar>
   );
 }
